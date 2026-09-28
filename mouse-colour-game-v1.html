@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>找出不同顏色</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --text: #20242a;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --accent: #111827;
+      --danger: #d92d20;
+      --success: #17803d;
+      --grid-size: min(70vw, 68vh, 600px);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px 16px 36px;
+      overflow-x: hidden;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .app {
+      width: min(960px, 100%);
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 12px;
+      text-align: center;
+      box-shadow: 0 4px 18px rgba(0,0,0,.04);
+    }
+
+    .stat .label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .stat .value {
+      display: block;
+      font-size: clamp(22px, 3vw, 34px);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .game-card {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    }
+
+    .heading-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 34px);
+      line-height: 1.15;
+    }
+
+    .title-wrap p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .restart-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .12s ease, background .12s ease;
+      white-space: nowrap;
+    }
+
+    .restart-btn:hover {
+      background: #f9fafb;
+    }
+
+    .restart-btn:active {
+      transform: scale(.97);
+    }
+
+    .game-zone {
+      position: relative;
+      width: 100%;
+      display: grid;
+      place-items: center;
+      min-height: var(--grid-size);
+    }
+
+    .grid {
+      width: var(--grid-size);
+      height: var(--grid-size);
+      display: grid;
+      gap: var(--gap, 8px);
+      grid-template-columns: repeat(var(--cols, 2), 1fr);
+      grid-template-rows: repeat(var(--cols, 2), 1fr);
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .tile {
+      border: none;
+      padding: 0;
+      border-radius: var(--radius, 14px);
+      cursor: pointer;
+      transition:
+        transform .12s ease,
+        box-shadow .12s ease,
+        outline-color .12s ease;
+      outline: 0 solid transparent;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tile:hover {
+      transform: scale(.992);
+    }
+
+    .tile:active {
+      transform: scale(.975);
+    }
+
+    .tile.correct {
+      animation: pop .28s ease;
+      outline: 4px solid rgba(23,128,61,.24);
+    }
+
+    .tile.wrong {
+      animation: shake .20s ease;
+      outline: 4px solid rgba(217,45,32,.45);
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    .feedback {
+      position: absolute;
+      z-index: 5;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(.96);
+      min-width: 160px;
+      text-align: center;
+      padding: 14px 20px;
+      border-radius: 16px;
+      font-size: 22px;
+      font-weight: 900;
+      background: rgba(255,255,255,.94);
+      box-shadow: 0 12px 34px rgba(0,0,0,.14);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .14s ease, transform .14s ease;
+    }
+
+    .feedback.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .feedback.good { color: var(--success); }
+    .feedback.bad  { color: var(--danger); }
+
+    .start-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(255,255,255,.94);
+      border-radius: 20px;
+    }
+
+    .start-box {
+      width: min(520px, 92%);
+      text-align: center;
+    }
+
+    .start-box h2 {
+      margin: 0 0 10px;
+      font-size: clamp(28px, 5vw, 46px);
+    }
+
+    .start-box p {
+      margin: 0 auto 22px;
+      max-width: 450px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .start-btn {
+      border: none;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 18px;
+      font-weight: 800;
+      padding: 14px 24px;
+      cursor: pointer;
+      min-width: 180px;
+      transition: transform .12s ease, opacity .12s ease;
+    }
+
+    .start-btn:hover { opacity: .92; }
+    .start-btn:active { transform: scale(.98); }
+
+    .tips {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 720px) {
+      :root {
+        --grid-size: min(88vw, 62vh, 560px);
+      }
+
+      body {
+        padding: 12px 10px 24px;
+      }
+
+      .topbar {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .game-card {
+        padding: 16px;
+        border-radius: 18px;
+      }
+
+      .heading-row {
+        align-items: flex-start;
+      }
+
+      .title-wrap p {
+        max-width: 230px;
+      }
+    }
+
+    @media (max-height: 720px) and (min-width: 721px) {
+      :root {
+        --grid-size: min(56vw, 58vh, 520px);
+      }
+
+      body {
+        padding-top: 10px;
+      }
+
+      .stat {
+        padding: 10px 8px;
+      }
+
+      .game-card {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <section class="topbar" aria-label="遊戲資料">
+      <div class="stat">
+        <span class="label">LEVEL</span>
+        <span class="value" id="levelValue">1</span>
+      </div>
+      <div class="stat">
+        <span class="label">SCORE</span>
+        <span class="value" id="scoreValue">0</span>
+      </div>
+      <div class="stat">
+        <span class="label">TIME</span>
+        <span class="value" id="timeValue">0.0</span>
+      </div>
+      <div class="stat">
+        <span class="label">BEST</span>
+        <span class="value" id="bestValue">0</span>
+      </div>
+    </section>
+
+    <section class="game-card">
+      <div class="heading-row">
+        <div class="title-wrap">
+          <h1>找出不同顏色</h1>
+          <p>越高 Level，格數越多，色差越細。</p>
+        </div>
+        <button class="restart-btn" id="restartBtn" type="button">重新開始</button>
+      </div>
+
+      <div class="game-zone">
+        <div class="grid" id="grid" aria-label="找出不同顏色的方格"></div>
+
+        <div class="feedback" id="feedback" aria-live="polite"></div>
+
+        <div class="start-overlay" id="startOverlay">
+          <div class="start-box">
+            <h2>你找得到嗎？</h2>
+            <p>
+              每一關只有一格的顏色不同。<br>
+              用滑鼠點選它，看看你可以去到幾多 Level！
+            </p>
+            <button class="start-btn" id="startBtn" type="button">START GAME</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tips">按錯不會 Game Over，你可以繼續尋找。</div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const levelValue = document.getElementById('levelValue');
+      const scoreValue = document.getElementById('scoreValue');
+      const timeValue = document.getElementById('timeValue');
+      const bestValue = document.getElementById('bestValue');
+      const grid = document.getElementById('grid');
+      const feedback = document.getElementById('feedback');
+      const startOverlay = document.getElementById('startOverlay');
+      const startBtn = document.getElementById('startBtn');
+      const restartBtn = document.getElementById('restartBtn');
+
+      const STORAGE_KEY = 'colourMouseGameBestLevelV1';
+
+      let level = 1;
+      let score = 0;
+      let bestLevel = Number(localStorage.getItem(STORAGE_KEY) || 0);
+
+      let targetIndex = -1;
+      let levelStartTime = 0;
+      let timerRAF = 0;
+      let inputLocked = true;
+      let gameRunning = false;
+
+      bestValue.textContent = bestLevel;
+
+      function getGridSize(level) {
+        if (level <= 3) return 2;
+        if (level <= 7) return 3;
+        if (level <= 12) return 4;
+        if (level <= 18) return 5;
+        if (level <= 25) return 6;
+        if (level <= 34) return 7;
+        if (level <= 44) return 8;
+        if (level <= 55) return 9;
+        return 10;
+      }
+
+      function getColourDifference(level) {
+        // 初期容易，之後逐步收窄，但保留最低可辨識色差
+        const start = 22;
+        const minimum = 3.2;
+        const decay = 0.34;
+        return Math.max(minimum, start - (level - 1) * decay);
+      }
+
+      function randomBaseColour() {
+        const h = Math.floor(Math.random() * 360);
+        const s = 48 + Math.floor(Math.random() * 33); // 48–80
+        const l = 36 + Math.floor(Math.random() * 29); // 36–64
+        return { h, s, l };
+      }
+
+      function targetColourFrom(base, difference) {
+        // 隨機決定變亮或變暗，避免答案永遠是同一方向
+        let direction = Math.random() < 0.5 ? -1 : 1;
+
+        // 避免超出舒適亮度範圍
+        if (base.l - difference < 24) direction = 1;
+        if (base.l + difference > 76) direction = -1;
+
+        const targetL = Math.max(18, Math.min(82, base.l + direction * difference));
+        return { ...base, l: targetL };
+      }
+
+      function hsl(c) {
+        return `hsl(${c.h} ${c.s}% ${c.l}%)`;
+      }
+
+      function updateHUD() {
+        levelValue.textContent = level;
+        scoreValue.textContent = score;
+        bestValue.textContent = bestLevel;
+      }
+
+      function setGridVisuals(size) {
+        const gap =
+          size <= 3 ? 10 :
+          size <= 5 ? 7 :
+          size <= 7 ? 5 :
+          3;
+
+        const radius =
+          size <= 3 ? 18 :
+          size <= 5 ? 14 :
+          size <= 7 ? 10 :
+          6;
+
+        grid.style.setProperty('--cols', size);
+        grid.style.setProperty('--gap', `${gap}px`);
+        grid.style.setProperty('--radius', `${radius}px`);
+      }
+
+      function renderGrid() {
+        grid.innerHTML = '';
+
+        const size = getGridSize(level);
+        const count = size * size;
+        const difference = getColourDifference(level);
+
+        const base = randomBaseColour();
+        const target = targetColourFrom(base, difference);
+
+        targetIndex = Math.floor(Math.random() * count);
+
+        setGridVisuals(size);
+
+        for (let i = 0; i < count; i++) {
+          const tile = document.createElement('button');
+          tile.type = 'button';
+          tile.className = 'tile';
+          tile.setAttribute('aria-label', `方格 ${i + 1}`);
+          tile.dataset.index = i;
+          tile.style.backgroundColor = i === targetIndex ? hsl(target) : hsl(base);
+          tile.addEventListener('click', handleTileClick);
+          grid.appendChild(tile);
+        }
+      }
+
+      function startTimer() {
+        cancelAnimationFrame(timerRAF);
+        levelStartTime = performance.now();
+
+        const tick = (now) => {
+          if (!gameRunning) return;
+          const seconds = (now - levelStartTime) / 1000;
+          timeValue.textContent = seconds.toFixed(1);
+          timerRAF = requestAnimationFrame(tick);
+        };
+
+        timerRAF = requestAnimationFrame(tick);
+      }
+
+      function stopTimer() {
+        cancelAnimationFrame(timerRAF);
+      }
+
+      function showFeedback(text, type, duration = 450) {
+        feedback.textContent = text;
+        feedback.className = `feedback ${type} show`;
+
+        setTimeout(() => {
+          feedback.className = 'feedback';
+        }, duration);
+      }
+
+      function generateLevel() {
+        inputLocked = false;
+        updateHUD();
+        renderGrid();
+        startTimer();
+      }
+
+      function handleTileClick(event) {
+        if (!gameRunning || inputLocked) return;
+
+        const tile = event.currentTarget;
+        const clickedIndex = Number(tile.dataset.index);
+
+        if (clickedIndex === targetIndex) {
+          handleCorrect(tile);
+        } else {
+          handleWrong(tile);
+        }
+      }
+
+      function handleCorrect(tile) {
+        inputLocked = true;
+        stopTimer();
+
+        tile.classList.add('correct');
+        showFeedback('✓ Correct!', 'good', 450);
+
+        score += 1;
+        level += 1;
+
+        if (level > bestLevel) {
+          bestLevel = level;
+          localStorage.setItem(STORAGE_KEY, String(bestLevel));
+        }
+
+        updateHUD();
+
+        setTimeout(() => {
+          generateLevel();
+        }, 360);
+      }
+
+      function handleWrong(tile) {
+        if (tile.classList.contains('wrong')) return;
+
+        tile.classList.add('wrong');
+        showFeedback('再試一次', 'bad', 300);
+
+        setTimeout(() => {
+          tile.classList.remove('wrong');
+        }, 220);
+      }
+
+      function startGame() {
+        level = 1;
+        score = 0;
+        gameRunning = true;
+        inputLocked = true;
+        timeValue.textContent = '0.0';
+        startOverlay.style.display = 'none';
+
+        updateHUD();
+        renderGrid();
+
+        setTimeout(() => {
+          inputLocked = false;
+          startTimer();
+        }, 160);
+      }
+
+      function restartGame() {
+        stopTimer();
+        feedback.className = 'feedback';
+        startGame();
+      }
+
+      startBtn.addEventListener('click', startGame);
+      restartBtn.addEventListener('click', restartGame);
+
+      // 先顯示一個靜態 2×2 背景，未開始時不計時
+      renderGrid();
+      updateHUD();
+    })();
+  </script>
+</body>
+</html>
